@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Table — personality poker simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--felt:#12352b;--felt2:#0d271f;--panel:#17402f;--line:#2c5a45;--ink:#f0ece0;--mut:#8fae9d;--gold:#d9b45e;--pos:#7ddc9a;--neg:#e08b7a;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--felt2);color:var(--ink);font:16px/1.5 "IBM Plex Mono",monospace}
+.wrap{max-width:1060px;margin:0 auto;padding:20px 16px 60px}
+header{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px}
+h1{font:900 30px "Playfair Display",Georgia,serif;margin:0;color:var(--gold);letter-spacing:.5px}
+.sub{color:var(--mut);font-size:12.5px;margin-top:4px}
+.table{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.seat{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:12px;transition:opacity .15s}
+.seat.off{opacity:.35}
+.seathead{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.seathead input[type=checkbox]{accent-color:var(--gold);width:16px;height:16px}
+.nm{flex:1;min-width:0;background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:4px 6px;font:600 13px "IBM Plex Mono",monospace}
+label{display:block;font-size:10.5px;color:var(--mut);margin:7px 0 3px;text-transform:uppercase;letter-spacing:1px}
+select{width:100%;background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px;font:13px "IBM Plex Mono",monospace}
+.trait{display:grid;grid-template-columns:56px 1fr 32px;gap:6px;align-items:center;margin:4px 0;font-size:11px}
+.trait input[type=range]{width:100%;height:3px;accent-color:var(--gold)}
+.trait .v{text-align:right;color:var(--mut)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0;align-items:center}
+button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:10px 16px;font:600 14px "IBM Plex Mono",monospace;cursor:pointer}
+button:hover{border-color:var(--gold)} button:focus-visible{outline:2px solid var(--gold)}
+button.primary{background:var(--gold);color:#1d1405;border-color:var(--gold)}
+.handsbox{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mut)}
+.handsbox input{width:88px;background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:7px;font:13px "IBM Plex Mono",monospace}
+.out{background:var(--felt);border:1px solid var(--line);border-radius:9px;padding:15px;min-height:140px}
+.out h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mut);font-weight:600}
+#out{font-size:13px;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow:auto}
+table.stats{width:100%;border-collapse:collapse;font-size:12.5px;white-space:normal}
+table.stats th{text-align:left;color:var(--mut);font-weight:600;padding:5px 7px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:10.5px;letter-spacing:.8px}
+table.stats td{padding:6px 7px;border-bottom:1px solid var(--line)}
+table.stats td.mut{color:var(--mut)}
+table.stats td.pos{color:var(--pos);font-weight:600} table.stats td.neg{color:var(--neg);font-weight:600}
+.note{color:var(--mut);font-size:11.5px;margin-top:10px}
+@media (max-width:860px){.table{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.table{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Card Table</h1>
+    <div class="sub">six seats, one pot · every player is a personality · simplified stud, two betting rounds</div>
+  </header>
+  <div class="table" id="table"></div>
+  <div class="actions">
+    <button class="primary" id="btnHand">Deal one hand</button>
+    <span class="handsbox">simulate <input type="number" id="hands" value="2000" min="10" max="20000"> hands
+      <button id="btnSim">Run</button>
+    </span>
+  </div>
+  <div class="out">
+    <h3 id="outTitle">Output</h3>
+    <div id="out">Enable at least two seats, then deal a hand to watch the betting, or run a simulation for per-seat statistics.</div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
