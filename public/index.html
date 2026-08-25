@@ -22,15 +22,20 @@ h1{font:900 30px "Playfair Display",Georgia,serif;margin:0;color:var(--gold);let
 .nm{flex:1;min-width:0;background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:4px 6px;font:600 13px "IBM Plex Mono",monospace}
 label{display:block;font-size:10.5px;color:var(--mut);margin:7px 0 3px;text-transform:uppercase;letter-spacing:1px}
 select{width:100%;background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px;font:13px "IBM Plex Mono",monospace}
-.trait{display:grid;grid-template-columns:56px 1fr 32px;gap:6px;align-items:center;margin:4px 0;font-size:11px}
+.trait{display:grid;grid-template-columns:56px 1fr 32px 12px;gap:6px;align-items:center;margin:4px 0;font-size:11px}
 .trait input[type=range]{width:100%;height:3px;accent-color:var(--gold)}
 .trait .v{text-align:right;color:var(--mut)}
+.lockmark{width:12px;text-align:center;font-size:10px}
 .actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0;align-items:center}
 button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:10px 16px;font:600 14px "IBM Plex Mono",monospace;cursor:pointer}
 button:hover{border-color:var(--gold)} button:focus-visible{outline:2px solid var(--gold)}
 button.primary{background:var(--gold);color:#1d1405;border-color:var(--gold)}
+button.ghost{background:transparent}
+button.mini{padding:4px 10px;font-size:11px}
 .handsbox{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mut)}
 .handsbox input{width:88px;background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:7px;font:13px "IBM Plex Mono",monospace}
+.sweepbox{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mut);flex-wrap:wrap}
+.sweepbox select{width:auto}
 .out{background:var(--felt);border:1px solid var(--line);border-radius:9px;padding:15px;min-height:140px}
 .out h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mut);font-weight:600}
 #out{font-size:13px;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow:auto}
@@ -40,6 +45,9 @@ table.stats td{padding:6px 7px;border-bottom:1px solid var(--line)}
 table.stats td.mut{color:var(--mut)}
 table.stats td.pos{color:var(--pos);font-weight:600} table.stats td.neg{color:var(--neg);font-weight:600}
 .note{color:var(--mut);font-size:11.5px;margin-top:10px}
+.summary{font-size:13px;color:var(--mut);margin-bottom:10px;padding:8px 10px;background:var(--panel);border-radius:6px}
+.summary b{color:var(--ink)}
+.lockrow{display:flex;gap:8px;margin-top:10px}
 @media (max-width:860px){.table{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:560px){.table{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -58,9 +66,17 @@ table.stats td.pos{color:var(--pos);font-weight:600} table.stats td.neg{color:va
       <button id="btnSim">Run</button>
     </span>
   </div>
+  <div class="actions">
+    <span class="sweepbox">
+      sweep seat <select id="sweepSeat"></select>
+      trait <select id="sweepTrait"></select>
+      <button id="btnSweep">Run sweep</button>
+      <button id="btnSweepAll" class="ghost">Sweep all traits</button>
+    </span>
+  </div>
   <div class="out">
     <h3 id="outTitle">Output</h3>
-    <div id="out">Enable at least two seats, then deal a hand to watch the betting, or run a simulation for per-seat statistics.</div>
+    <div id="out">Enable at least two seats, then deal a hand to watch the betting, run a simulation for per-seat statistics, or sweep a seat's trait to see how it moves net chips.</div>
   </div>
 </div>
 <script src="app.js"></script>
