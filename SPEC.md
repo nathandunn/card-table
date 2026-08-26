@@ -1,42 +1,54 @@
-# Card Table — SPEC v0.2
+# Card Table — SPEC v0.3
 
-Status: agreed 2026-08-25.
+Status: agreed 2026-08-26, from a feedback session. Supersedes v0.2.
+Cross-cutting requirements (league, legibility, lab, style):
+see `hub-orchestrator/specs/2026-08-26-suite-v0.3.md`.
 
 ## Verdict
-Iterate, with one substantive rules change.
+**Iterate, deeply.** Hand evaluation is real now, but the betting doesn't
+feel like poker. Three structural changes fix that.
 
-## Change — real poker hand evaluation
-v0.1 used a placeholder: one hole card plus one shared community card, pair
-beats high card. This made `focus` and `risk` blur a very crude number, so
-trait configuration had less meaning than it should.
+## 1. Real street betting
 
-v0.2 uses real hand ranking:
-- Two hole cards per seat, five community cards (flop / turn / river)
-- Full ranking: high card, pair, two pair, trips, straight, flush, full house,
-  quads, straight flush
-- Hand strength estimation becomes a genuine read, so `focus` meaningfully
-  sharpens or blurs it and `risk` meaningfully governs marginal calls
+Today all five community cards are dealt up front and two betting rounds run
+against the full board — the replay reveals streets, but the betting ignores
+them. Replace with real Hold'em rhythm: **four betting rounds** — pre-flop,
+flop, turn, river — each bet **only on the cards revealed so far.**
 
-## Add — animated hand
-- Cards dealt to each seat
-- Chips pushed to pot on bet / call / raise
-- Per-seat action indicator (fold greys the seat, raise flashes)
-- Community cards revealed street by street
-- Showdown: hands revealed, winning hand named and highlighted
-- Playback controls: play / pause / step / speed
+Consequence for the AI: `strength()` must evaluate partial hands (2 cards,
+then 5/6/7 visible) so a seat's confidence genuinely grows or collapses
+street by street. This feeds the live thinking readout directly — you watch
+a seat's read swing on the turn card.
 
-## Add — sweep upgrades
-Same four as the other simulators, adapted to N seats:
-1. Sweep any seat, not a fixed one
-2. Per-sweep summary: best value, net chip delta, shape of effect
-3. Sweep all traits, ranked by impact on that seat's net result
-4. Lock to best / worst and continue
+## 2. Blinds + rebuy
 
-## Keep
-Six configurable seats, enable/disable per seat, custom names, archetype
-presets, per-seat statistics table (net, chips, win rate, VPIP, fold rate,
-showdown win rate).
+Replace the every-seat ante with **rotating small/big blinds** (fold-forever
+is no longer free). **Busted seats rebuy** after sitting out a hand or two,
+so the table never dies — required for an endless league.
 
-## Audience
-Public demo. The stats table is the substance here; animation is for
-legibility of individual hands.
+## 3. Personality-scaled betting, up to all-in
+
+Fixed bet 10 / max 3 raises goes away. Bet size scales with hand confidence
+AND personality — aggressive/risky seats overbet and shove, cautious seats
+min-bet — up to **true all-in**. Stack pressure becomes visible personality,
+and all-in showdowns become the league's marquee moments.
+
+**Bluffing is emergent, and should be made explicit in tuning:** a
+high-risk / high-aggression seat sizing up on a weak read IS a bluff; the
+post-match story card should call it out ("Ripper bluffed 4 pots, got
+caught once").
+
+## Keep from v0.2
+- Real Texas Hold'em hand evaluation (`handEval.ts`) — unchanged.
+- The animated hand replay — extended to the four-street rhythm (bet
+  frames between reveals instead of after the full board).
+- Per-seat stats; add per-street aggression and bluff counts.
+- Sweep/evolve/simulate (now in the Lab section).
+- N-seat support (2–6) in the Lab; the league/tank picks its own table size.
+
+## Out of scope
+- Side pots done fully correctly for multi-way all-ins may be simplified
+  (single main pot + capped winnings) if the full treatment fights the
+  deterministic frame log — flag the choice in the implementation.
+- Tournament structures beyond the suite league.
+- Human seats.
