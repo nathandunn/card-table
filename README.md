@@ -5,9 +5,15 @@ games in [battle-bots](https://github.com/nathandunn/battle-bots) and
 [pack-hunt](https://github.com/nathandunn/pack-hunt), this is an **N-player table** —
 2 to 6 seats, each with its own agent and trait profile, competing for one pot.
 
-**The game** — simplified stud. Each player antes, gets one hole card plus a shared
-community card, then two betting rounds: check / bet / call / raise / fold. Best
-hand at showdown takes the pot.
+**The game** — Texas Hold'em hands. Each player antes and gets two hole cards, and
+five community cards are dealt out flop / turn / river, then two betting rounds:
+check / bet / call / raise / fold. Best five-card hand at showdown takes the pot,
+ranked high card through straight flush.
+
+**Watching a hand** — a single hand plays back as an animated replay: cards dealt,
+the board revealed street by street, chips arcing to the pot, per-seat action
+badges, and the winning five picked out at showdown. Play/pause, step, restart,
+1x/2x/4x and a beat scrubber.
 
 **Where personality bites**
 - **aggression** drives bet and raise frequency
