@@ -296,8 +296,9 @@ function drawPot(amount: number, flying = 0) {
   ctx.fillText(String(Math.round(amount)), CX, CY - 78);
 }
 
-const ACT_LABEL: Record<Act, string> = { check: "CHECK", bet: "BET", call: "CALL", raise: "RAISE", fold: "FOLD" };
-function actColor(a: Act) { return a === "fold" ? NEG : a === "check" ? MUT : a === "raise" || a === "bet" ? GOLD : POS; }
+const ACT_LABEL: Record<Act, string> = { check: "CHECK", bet: "BET", call: "CALL", raise: "RAISE", fold: "FOLD", allin: "ALL-IN" };
+const HOT = "#ff9d6e";
+function actColor(a: Act) { return a === "fold" ? NEG : a === "check" ? MUT : a === "allin" ? HOT : a === "raise" || a === "bet" ? GOLD : POS; }
 
 interface SeatFx { alpha: number; active: number; flash: number; win: number; }
 
@@ -441,14 +442,29 @@ function draw() {
     }
 
     const faceUp = f.kind === "showdown" && st.inHand && f.winners.length > 0 && f.handName !== "";
-    const badge = acting ? f.act : (!st.inHand ? "fold" as Act : null);
+    const badge = acting ? f.act : (!st.inHand ? "fold" as Act : st.inHand && st.chips === 0 && st.committed > 0 ? "allin" as Act : null);
 
     drawSeat(pos.x, pos.y, st.name, st.persona, f.kind === "deal" ? st.chips : chipsNow,
       f.kind === "deal" ? st.committed : commNow, st.hole,
       faceUp && p > 0.35, dealP, badge, fx);
 
+    if (i === f.button) {
+      const bx = lerp(pos.x, CX, 0.30), by = lerp(pos.y, CY, 0.30);
+      ctx.save();
+      ctx.fillStyle = FACE;
+      ctx.beginPath(); ctx.arc(bx, by, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(bx, by, 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = FACE_INK;
+      ctx.font = `600 10px ${MONO}`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("D", bx, by + 0.5);
+      ctx.restore();
+      ctx.textBaseline = "alphabetic";
+    }
+
     if (acting && f.amount > 0) drawChipRun(pos, { x: CX, y: CY - 62 }, f.amount, p);
-    if (wonHere) drawChipRun({ x: CX, y: CY - 62 }, pos, f.amount / f.winners.length, p);
+    if (wonHere) drawChipRun({ x: CX, y: CY - 62 }, pos, f.payouts[f.winners.indexOf(i)] ?? f.amount / f.winners.length, p);
   }
 
   // street / round caption under the board
@@ -460,7 +476,10 @@ function draw() {
   if (f.kind === "showdown") {
     const a = ramp(p, T_BANNER, T_BANNER + 0.25);
     if (a > 0) {
-      const names = f.winners.map(i => f.seats[i].name).join(" & ");
+      const contestedIdx = f.winners.filter((_, k) => f.contested[k] !== false);
+      const namedIdx = contestedIdx.length ? contestedIdx : f.winners;
+      const names = namedIdx.map(i => f.seats[i].name).join(" & ");
+      const wonAmt = f.winners.reduce((sum, _, k) => (f.contested[k] !== false ? sum + (f.payouts[k] ?? 0) : sum), 0) || f.amount;
       ctx.save();
       ctx.globalAlpha = a * 0.9;
       ctx.fillStyle = "#08170f";
@@ -473,7 +492,7 @@ function draw() {
       ctx.globalAlpha = a;
       ctx.fillStyle = MUT;
       ctx.font = `11px ${MONO}`;
-      ctx.fillText(f.handName ? `wins ${f.amount}` : `wins ${f.amount} — everyone folded`, CX, CY + 124);
+      ctx.fillText(f.handName ? `wins ${wonAmt}` : `wins ${wonAmt} — everyone folded`, CX, CY + 124);
       ctx.restore();
     }
   }
@@ -565,24 +584,28 @@ document.getElementById("btnSim")!.addEventListener("click", () => {
   const n = Math.max(10, Math.min(20000, +handsInput.value || 2000));
   runTable(seats, n, 4242);
   outTitle.textContent = `Simulation — ${n} hands, ${seats.length} seats`;
-  const rows = seats.slice().sort((a, b) => b.chips - a.chips).map(s => {
+  const rows = seats.slice().sort((a, b) => b.stats.net - a.stats.net).map(s => {
     const st = s.stats;
-    const net = s.chips - 200;
+    const net = st.net;
     const cls = net > 0 ? "pos" : net < 0 ? "neg" : "";
     return `<tr>
       <td>${esc(s.name)}</td><td class="mut">${s.p.id}</td>
       <td class="${cls}">${net >= 0 ? "+" : ""}${net}</td>
       <td>${s.chips}</td>
+      <td>${st.rebuys}</td>
       <td>${st.hands ? (st.won / st.hands * 100).toFixed(1) : "0.0"}%</td>
       <td>${st.hands ? (st.vpip / st.hands * 100).toFixed(1) : "0.0"}%</td>
       <td>${st.hands ? (st.folds / st.hands * 100).toFixed(1) : "0.0"}%</td>
       <td>${st.showdowns ? (st.showdownWins / st.showdowns * 100).toFixed(1) : "—"}%</td>
+      <td class="mut">${st.aggr.join("/")}</td>
+      <td>${st.bluffs}</td>
+      <td>${st.allIns}</td>
     </tr>`;
   }).join("");
   out.innerHTML = `<table class="stats">
-    <tr><th>seat</th><th>persona</th><th>net</th><th>chips</th><th>won</th><th>vpip</th><th>fold</th><th>sd win</th></tr>
+    <tr><th>seat</th><th>persona</th><th>net</th><th>chips</th><th>rebuy</th><th>won</th><th>vpip</th><th>fold</th><th>sd win</th><th>aggr p/f/t/r</th><th>bluffs</th><th>all-ins</th></tr>
     ${rows}</table>
-    <div class="note">each seat starts at 200 chips · ante 2 · bet 10 · vpip = voluntarily put money in pot</div>`;
+    <div class="note">200 buy-in · blinds 2/4, button rotates · busted seats sit a hand out then rebuy 200 · net = chips − every buy-in · vpip = voluntarily put money in pre-flop · aggr = bets+raises per street (pre-flop/flop/turn/river) · bluff = big bet or raise on a read under 0.35</div>`;
 });
 
 /** Metric: net chips of the swept seat after N hands, with everyone else fixed. */
@@ -593,7 +616,7 @@ function makeEvaluator(seatIdx: number, n: number) {
     const seats = enabledIdx.map((idx, k) => newSeat(`s${k}`, seatUIs[idx].getName(), idx === seatIdx ? p : fixed[idx]));
     runTable(seats, n, 8080);
     const target = seats.find((_, k) => enabledIdx[k] === seatIdx)!;
-    return target.chips - 200;
+    return target.stats.net; // chips minus every buy-in, so rebuys count against you
   };
 }
 
