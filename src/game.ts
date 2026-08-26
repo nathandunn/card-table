@@ -1,6 +1,6 @@
 import { Rng, utilityDecide, type Candidate, type Personality } from "@precog/sim-core";
-import { bestHand, compareHandValue, CATEGORY_NAME, type HandValue } from "./handEval.js";
-export { bestHand, compareHandValue, CATEGORY_NAME, type HandValue };
+import { bestHand, bestFive, compareHandValue, CATEGORY_NAME, type HandValue } from "./handEval.js";
+export { bestHand, bestFive, compareHandValue, CATEGORY_NAME, type HandValue };
 
 export interface PotShare<T> { item: T; amount: number; hv: HandValue; }
 
@@ -68,7 +68,35 @@ function candidates(s: number, facingBet: boolean, toCall: number, chips: number
   return c;
 }
 
-export interface HandLog { lines: string[]; }
+/** One seat as it stood at the end of a beat. Snapshots are copies, so scrubbing back is free. */
+export interface SeatSnapshot {
+  name: string; persona: string; chips: number; committed: number;
+  inHand: boolean; hole: [Card, Card] | null;
+}
+
+export type FrameKind = "deal" | "street" | "action" | "showdown";
+
+/** One meaningful beat of a hand: the deal, a street reveal, a single betting action, or the showdown.
+ *  A hand is deterministic given its seed, so the animation replays this log rather than re-simulating. */
+export interface HandFrame {
+  kind: FrameKind;
+  label: string;            // "deal" | "flop" | "turn" | "river" | "round 1" | "round 2" | "showdown"
+  round: number;            // 0 before betting, 1 or 2 for a betting round, 3 at showdown
+  seat: number;             // acting (or winning) seat index into `seats`, -1 if none
+  act: Act | null;
+  strength: number | null;  // the acting seat's read, as it saw it
+  amount: number;           // chips moving on this beat
+  potBefore: number;
+  potAfter: number;
+  reveal: number;           // community cards face-up after this beat
+  seats: SeatSnapshot[];    // the table after this beat
+  note: string;             // one line for the HUD
+  winners: number[];        // seat indices taking a share of the pot
+  handName: string;         // e.g. "two pair", at showdown
+  best: Card[];             // the five cards that won it, for the highlight
+}
+
+export interface HandLog { lines: string[]; frames?: HandFrame[]; community?: Card[]; }
 
 export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: HandLog): void {
   const live = seats.filter(x => x.chips > ante);
@@ -83,6 +111,31 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
   log?.lines.push(`community ${community.map(cardStr).join(" ")} · ante ${ante} · pot ${pot}`);
   for (const x of live) log?.lines.push(`  ${x.name.padEnd(14)} holds ${holeStr(x.hole!)}`);
 
+  // ── frame log ──────────────────────────────────────────────────
+  // Purely a recording of what already happened: it reads state, never the rng, so the
+  // deterministic stream the sweeps and batch simulations depend on is untouched.
+  const frames = log ? (log.frames ??= []) : null;
+  if (log) log.community = community;
+  const snapshot = (): SeatSnapshot[] => live.map(x => ({
+    name: x.name, persona: x.p.id, chips: x.chips, committed: x.committed,
+    inHand: x.inHand, hole: x.hole ? [x.hole[0], x.hole[1]] as [Card, Card] : null,
+  }));
+  const beat = (f: Omit<HandFrame, "seats">) => { frames!.push({ ...f, seats: snapshot() }); };
+  const blank = { seat: -1, act: null as Act | null, strength: null as number | null, amount: 0,
+    winners: [] as number[], handName: "", best: [] as Card[] };
+
+  if (frames) {
+    beat({ ...blank, kind: "deal", label: "deal", round: 0, amount: ante * live.length,
+      potBefore: 0, potAfter: pot, reveal: 0,
+      note: `${live.length} seats dealt in · ante ${ante} each · pot ${pot}` });
+    // Both betting rounds are read against the full board, so the board is laid out first,
+    // one street at a time, and the betting follows.
+    for (const [label, reveal] of [["flop", 3], ["turn", 4], ["river", 5]] as const) {
+      beat({ ...blank, kind: "street", label, round: 0, potBefore: pot, potAfter: pot, reveal,
+        note: `${label} — ${community.slice(reveal === 3 ? 0 : reveal - 1, reveal).map(cardStr).join(" ")}` });
+    }
+  }
+
   for (let round = 1; round <= 2; round++) {
     let currentBet = 0;
     let raises = 0;
@@ -91,6 +144,7 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
       const contenders = live.filter(y => y.inHand);
       if (contenders.length < 2) break;
       const s = strength(x.hole!, community, x.p, rng);
+      const potBefore = pot;
       const toCall = currentBet - (x.committed - ante);
       const act = utilityDecide(candidates(s, toCall > 0, toCall, x.chips), x.p, rng).action;
       if (act === "fold") { x.inHand = false; x.stats.folds++; }
@@ -100,6 +154,12 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
         else { const amt = Math.min(toCall + betSize, x.chips); x.chips -= amt; x.committed += amt; pot += amt; currentBet += betSize; raises++; if (round === 1) x.stats.vpip++; }
       }
       log?.lines.push(`  R${round} ${x.name.padEnd(14)} ${act.padEnd(6)} (strength ${s.toFixed(2)}, pot ${pot})`);
+      if (frames) {
+        const moved = pot - potBefore;
+        beat({ ...blank, kind: "action", label: `round ${round}`, round, seat: live.indexOf(x),
+          act, strength: s, amount: moved, potBefore, potAfter: pot, reveal: 5,
+          note: `${x.name} ${act}${moved > 0 ? ` ${moved}` : ""} · read ${s.toFixed(2)} · pot ${pot}` });
+      }
     }
   }
 
@@ -110,6 +170,12 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
     winner.chips += pot;
     winner.stats.won++;
     log?.lines.push(`${winner.name} takes ${pot} — everyone folded`);
+    if (frames) {
+      beat({ ...blank, kind: "showdown", label: "everyone folded", round: 3,
+        seat: live.indexOf(winner), winners: [live.indexOf(winner)], amount: pot,
+        potBefore: pot, potAfter: 0, reveal: 5,
+        note: `${winner.name} takes ${pot} — everyone folded` });
+    }
   } else {
     for (const x of contenders) x.stats.showdowns++;
     const entries = contenders.map(x => ({ item: x, hv: bestHand([...x.hole!, ...community]) }));
@@ -120,6 +186,16 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
       log?.lines.push(`showdown → ${shares[0].item.name} wins ${pot} with ${label} (${holeStr(shares[0].item.hole!)})`);
     } else {
       log?.lines.push(`showdown → split ${pot} between ${shares.map(sh => sh.item.name).join(", ")} — ${label}`);
+    }
+    if (frames) {
+      const names = shares.map(sh => sh.item.name).join(", ");
+      beat({ ...blank, kind: "showdown", label: "showdown", round: 3,
+        seat: live.indexOf(shares[0].item), winners: shares.map(sh => live.indexOf(sh.item)),
+        amount: pot, potBefore: pot, potAfter: 0, reveal: 5,
+        handName: label, best: bestFive([...shares[0].item.hole!, ...community]),
+        note: shares.length === 1
+          ? `${names} wins ${pot} with ${label}`
+          : `split ${pot} — ${names}, ${label}` });
     }
   }
   for (const x of live) x.stats.net = x.chips - 200;

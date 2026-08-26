@@ -36,6 +36,16 @@ button.mini{padding:4px 10px;font-size:11px}
 .handsbox input{width:88px;background:var(--felt2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:7px;font:13px "IBM Plex Mono",monospace}
 .sweepbox{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mut);flex-wrap:wrap}
 .sweepbox select{width:auto}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:12px;margin-bottom:14px}
+#handCanvas{width:100%;height:auto;display:block;border-radius:6px;background:var(--felt2)}
+.boardhud{display:flex;justify-content:space-between;align-items:center;gap:12px;font:12px "IBM Plex Mono",monospace;color:var(--mut);margin-top:9px;flex-wrap:wrap}
+.boardhud .hact{color:var(--gold)} .boardhud .hwin{color:var(--pos)} .boardhud .hfold{color:var(--neg)} .boardhud .hmut{color:var(--mut)}
+.boardctrl{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;font-size:13px;color:var(--mut)}
+.boardctrl button{padding:6px 12px;font-size:13px}
+.boardctrl button:disabled{opacity:.4;cursor:default;border-color:var(--line)}
+.boardctrl select{width:auto;padding:6px}
+#scrub{flex:1;min-width:150px;accent-color:var(--gold);height:4px}
+#scrub:disabled{opacity:.4}
 .out{background:var(--felt);border:1px solid var(--line);border-radius:9px;padding:15px;min-height:140px}
 .out h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mut);font-weight:600}
 #out{font-size:13px;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow:auto}
@@ -57,7 +67,7 @@ table.stats td.pos{color:var(--pos);font-weight:600} table.stats td.neg{color:va
 <div class="wrap">
   <header>
     <h1>Card Table</h1>
-    <div class="sub">six seats, one pot · every player is a personality · simplified stud, two betting rounds</div>
+    <div class="sub">six seats, one pot · every player is a personality · hold'em hands, two betting rounds</div>
   </header>
   <div class="table" id="table"></div>
   <div class="actions">
@@ -74,6 +84,20 @@ table.stats td.pos{color:var(--pos);font-weight:600} table.stats td.neg{color:va
       <button id="btnSweepAll" class="ghost">Sweep all traits</button>
     </span>
   </div>
+  <section class="board">
+    <canvas id="handCanvas" role="img" aria-label="Animated replay of the current hand"></canvas>
+    <div class="boardhud">
+      <span id="roundLbl">beat 0 / 0</span>
+      <span id="stateLbl">no hand yet</span>
+    </div>
+    <div class="boardctrl">
+      <button id="playBtn">&#9654; Play</button>
+      <button id="stepBtn">Step</button>
+      <button id="restartBtn">Restart</button>
+      speed <select id="speedSel"><option value="1x">1x</option><option value="2x">2x</option><option value="4x">4x</option></select>
+      <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="Scrub to a beat of the hand">
+    </div>
+  </section>
   <div class="out">
     <h3 id="outTitle">Output</h3>
     <div id="out">Enable at least two seats, then deal a hand to watch the betting, run a simulation for per-seat statistics, or sweep a seat's trait to see how it moves net chips.</div>

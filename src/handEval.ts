@@ -116,3 +116,16 @@ export function bestHand(cards: Card[]): HandValue {
   }
   return best;
 }
+
+/** The five cards that make the best hand, not just its value — used to highlight a hand at showdown.
+ *  Ties break the same way as `bestHand`, so the cards always match the value it reports. */
+export function bestFive(cards: Card[]): Card[] {
+  if (cards.length <= 5) return cards.slice();
+  let bestCards = cards.slice(0, 5);
+  let best = evaluate5(bestCards);
+  for (const five of combinations5(cards)) {
+    const v = evaluate5(five);
+    if (compareHandValue(v, best) > 0) { best = v; bestCards = five; }
+  }
+  return bestCards;
+}
