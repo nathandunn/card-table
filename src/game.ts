@@ -136,22 +136,29 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
     }
   }
 
+  // Chips a seat has put in during the CURRENT betting round only (as opposed to `x.committed`,
+  // which accumulates for the whole hand and still drives the pot/display math below). toCall
+  // must be measured against this round-scoped figure, or a seat's round-1 contribution bleeds
+  // into round 2 and makes toCall go negative before anyone has acted.
+  const roundCommitted = new Map<Seat, number>();
+
   for (let round = 1; round <= 2; round++) {
     let currentBet = 0;
     let raises = 0;
+    for (const x of live) roundCommitted.set(x, 0);
     for (const x of live) {
       if (!x.inHand || x.chips <= 0) continue;
       const contenders = live.filter(y => y.inHand);
       if (contenders.length < 2) break;
       const s = strength(x.hole!, community, x.p, rng);
       const potBefore = pot;
-      const toCall = currentBet - (x.committed - ante);
+      const toCall = currentBet - (roundCommitted.get(x) ?? 0);
       const act = utilityDecide(candidates(s, toCall > 0, toCall, x.chips), x.p, rng).action;
       if (act === "fold") { x.inHand = false; x.stats.folds++; }
-      else if (act === "call") { const amt = Math.min(toCall, x.chips); x.chips -= amt; x.committed += amt; pot += amt; if (round === 1) x.stats.vpip++; }
+      else if (act === "call") { const amt = Math.min(toCall, x.chips); x.chips -= amt; x.committed += amt; roundCommitted.set(x, (roundCommitted.get(x) ?? 0) + amt); pot += amt; if (round === 1) x.stats.vpip++; }
       else if (act === "bet" || act === "raise") {
-        if (raises >= 3) { const amt = Math.min(toCall, x.chips); x.chips -= amt; x.committed += amt; pot += amt; }
-        else { const amt = Math.min(toCall + betSize, x.chips); x.chips -= amt; x.committed += amt; pot += amt; currentBet += betSize; raises++; if (round === 1) x.stats.vpip++; }
+        if (raises >= 3) { const amt = Math.min(toCall, x.chips); x.chips -= amt; x.committed += amt; roundCommitted.set(x, (roundCommitted.get(x) ?? 0) + amt); pot += amt; }
+        else { const amt = Math.min(toCall + betSize, x.chips); x.chips -= amt; x.committed += amt; roundCommitted.set(x, (roundCommitted.get(x) ?? 0) + amt); pot += amt; currentBet += betSize; raises++; if (round === 1) x.stats.vpip++; }
       }
       log?.lines.push(`  R${round} ${x.name.padEnd(14)} ${act.padEnd(6)} (strength ${s.toFixed(2)}, pot ${pot})`);
       if (frames) {
