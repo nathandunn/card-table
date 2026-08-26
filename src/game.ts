@@ -1,15 +1,35 @@
 import { Rng, utilityDecide, type Candidate, type Personality } from "@precog/sim-core";
+import { bestHand, compareHandValue, CATEGORY_NAME, type HandValue } from "./handEval.js";
+export { bestHand, compareHandValue, CATEGORY_NAME, type HandValue };
+
+export interface PotShare<T> { item: T; amount: number; hv: HandValue; }
+
+/** Award a pot to the best-hand entries, splitting evenly on ties. Any remainder chip (pot not
+ *  divisible by winner count) goes to the earliest winners in entry order, so results stay deterministic. */
+export function splitPot<T>(pot: number, entries: { item: T; hv: HandValue }[]): PotShare<T>[] {
+  let best = entries[0].hv;
+  for (const e of entries) if (compareHandValue(e.hv, best) > 0) best = e.hv;
+  const winners = entries.filter(e => compareHandValue(e.hv, best) === 0);
+  const share = Math.floor(pot / winners.length);
+  let remainder = pot - share * winners.length;
+  return winners.map(w => {
+    const amount = share + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+    return { item: w.item, amount, hv: w.hv };
+  });
+}
 
 export const RANKS = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
 export const SUITS = ["♠","♥","♦","♣"];
 export interface Card { r: number; s: number; }
 export const cardStr = (c: Card) => `${RANKS[c.r]}${SUITS[c.s]}`;
+export const holeStr = (h: [Card, Card]) => `${cardStr(h[0])} ${cardStr(h[1])}`;
 
 export type Act = "check" | "bet" | "call" | "raise" | "fold";
 
 export interface Seat {
   id: string; name: string; p: Personality;
-  chips: number; hole: Card | null; inHand: boolean; committed: number;
+  chips: number; hole: [Card, Card] | null; inHand: boolean; committed: number;
   stats: { hands: number; won: number; vpip: number; folds: number; showdowns: number; showdownWins: number; net: number };
 }
 
@@ -25,18 +45,13 @@ function deck(rng: Rng): Card[] {
   return d;
 }
 
-/** Hand strength 0..1 — pair with community beats high card; focus adds read accuracy. */
-export function strength(hole: Card, community: Card, p: Personality, rng: Rng): number {
-  const paired = hole.r === community.r;
-  const suited = hole.s === community.s;
-  let s = hole.r / 12 * 0.55 + (paired ? 0.4 : 0) + (suited ? 0.05 : 0);
+/** Hand strength 0..1 from the real best-5-of-7 evaluation; focus governs how accurately a seat reads it. */
+export function strength(hole: [Card, Card], community: Card[], p: Personality, rng: Rng): number {
+  const hv = bestHand([...hole, ...community]);
+  let s = (hv.category + (hv.tiebreakers[0] ?? 0) / 13) / 9;
   const blur = (1 - p.traits.focus) * 0.3;
   s += (rng.next() - 0.5) * blur;
   return Math.min(1, Math.max(0, s));
-}
-
-export function score(hole: Card, community: Card): number {
-  return (hole.r === community.r ? 1000 : 0) + hole.r * 10 + hole.s;
 }
 
 function candidates(s: number, facingBet: boolean, toCall: number, chips: number): Candidate<Act>[] {
@@ -62,11 +77,11 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
   let pot = 0;
   for (const x of live) {
     x.inHand = true; x.committed = ante; x.chips -= ante; pot += ante;
-    x.hole = d.pop()!; x.stats.hands++;
+    x.hole = [d.pop()!, d.pop()!]; x.stats.hands++;
   }
-  const community = d.pop()!;
-  log?.lines.push(`community ${cardStr(community)} · ante ${ante} · pot ${pot}`);
-  for (const x of live) log?.lines.push(`  ${x.name.padEnd(14)} holds ${cardStr(x.hole!)}`);
+  const community = [d.pop()!, d.pop()!, d.pop()!, d.pop()!, d.pop()!];
+  log?.lines.push(`community ${community.map(cardStr).join(" ")} · ante ${ante} · pot ${pot}`);
+  for (const x of live) log?.lines.push(`  ${x.name.padEnd(14)} holds ${holeStr(x.hole!)}`);
 
   for (let round = 1; round <= 2; round++) {
     let currentBet = 0;
@@ -90,16 +105,23 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
 
   const contenders = live.filter(x => x.inHand);
   if (contenders.length === 0) return;
-  let winner = contenders[0];
   if (contenders.length === 1) {
+    const winner = contenders[0];
+    winner.chips += pot;
+    winner.stats.won++;
     log?.lines.push(`${winner.name} takes ${pot} — everyone folded`);
   } else {
-    for (const x of contenders) { x.stats.showdowns++; if (score(x.hole!, community) > score(winner.hole!, community)) winner = x; }
-    winner.stats.showdownWins++;
-    log?.lines.push(`showdown → ${winner.name} wins ${pot} with ${cardStr(winner.hole!)}`);
+    for (const x of contenders) x.stats.showdowns++;
+    const entries = contenders.map(x => ({ item: x, hv: bestHand([...x.hole!, ...community]) }));
+    const shares = splitPot(pot, entries);
+    for (const sh of shares) { sh.item.chips += sh.amount; sh.item.stats.won++; sh.item.stats.showdownWins++; }
+    const label = CATEGORY_NAME[shares[0].hv.category];
+    if (shares.length === 1) {
+      log?.lines.push(`showdown → ${shares[0].item.name} wins ${pot} with ${label} (${holeStr(shares[0].item.hole!)})`);
+    } else {
+      log?.lines.push(`showdown → split ${pot} between ${shares.map(sh => sh.item.name).join(", ")} — ${label}`);
+    }
   }
-  winner.chips += pot;
-  winner.stats.won++;
   for (const x of live) x.stats.net = x.chips - 200;
 }
 

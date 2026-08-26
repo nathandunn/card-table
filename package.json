@@ -3,8 +3,19 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Multi-seat card betting simulator with personality-driven players on @precog/sim-core",
-  "scripts": { "build": "esbuild src/main.ts --bundle --format=iife --outfile=public/app.js --minify" },
-  "dependencies": { "@precog/sim-core": "file:../sim-core", "@precog/agent-forge": "file:../agent-forge" },
-  "devDependencies": { "esbuild": "^0.23.0", "typescript": "^5.5.0" },
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --format=iife --outfile=public/app.js --minify",
+    "build:ts": "tsc -p .",
+    "test": "npm run build:ts && node --test dist/test/*.js"
+  },
+  "dependencies": {
+    "@precog/agent-forge": "file:../agent-forge",
+    "@precog/sim-core": "file:../sim-core"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.0"
+  },
   "license": "MIT"
 }
