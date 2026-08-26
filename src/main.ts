@@ -1,6 +1,7 @@
 import { ARCHETYPES, CORE_TRAITS, type Personality } from "@precog/sim-core";
 import { newSeat, runTable, RANKS, SUITS, type Seat, type HandLog, type HandFrame, type FrameKind, type Card, type Act } from "./game.js";
 import { sweepTrait, sweepAll, SHAPE_LABEL, setTrait, type TraitKey } from "@precog/agent-forge/dist/sweep.js";
+import { evolve } from "@precog/agent-forge/dist/evolve.js";
 
 const TRAITS = [...CORE_TRAITS, "randomness"] as const;
 const ARCH = Object.keys(ARCHETYPES);
@@ -634,5 +635,34 @@ document.getElementById("btnSweepAll")!.addEventListener("click", () => {
   out.innerHTML = `<table class="stats"><tr><th>trait</th><th>impact</th><th>shape</th><th>best</th><th></th></tr>${rows}</table>`;
   out.querySelectorAll<HTMLButtonElement>(".mini").forEach(btn => {
     btn.addEventListener("click", () => applyLock(seatIdx, btn.dataset.trait as TraitKey, +btn.dataset.value!));
+  });
+});
+
+/** Optimizer stage 2: evolve all 7 traits of one seat at once against the fixed table. */
+document.getElementById("btnEvolve")!.addEventListener("click", () => {
+  if (!sweepSeatSel.value) { out.textContent = "Enable at least one seat to evolve."; return; }
+  const seatIdx = +sweepSeatSel.value;
+  const base = seatUIs[seatIdx].getP();
+  const POP = 14, GENS = 10, N = 100;
+  const evaluate = makeEvaluator(seatIdx, N);
+  const chips = (x: number) => `${x >= 0 ? "+" : ""}${x.toFixed(0)}`;
+  const genRows: string[] = [];
+  const r = evolve({
+    evaluate, base, seed: 9000, popSize: POP, generations: GENS,
+    onGeneration: g => genRows.push(`<tr><td>${g.generation}</td><td>${chips(g.bestFitness)}</td><td>${chips(g.meanFitness)}</td></tr>`),
+  });
+
+  outTitle.textContent = `Evolve — ${seatUIs[seatIdx].getName()}, pop ${POP} × ${GENS} generations (${r.evaluations} evaluations × ${N} hands = ${r.evaluations * N} hands)`;
+  const gene = (t: TraitKey) => t === "randomness" ? r.best.randomness : r.best.traits[t];
+  const vector = TRAITS.map(t => `${t} <b>${gene(t).toFixed(2)}</b>`).join(" · ");
+  out.innerHTML =
+    `<div class="summary">best net chips <b>${chips(r.bestFitness)}</b> · started at ${chips(r.history[0].bestFitness)}</div>` +
+    `<table class="stats"><tr><th>gen</th><th>best net</th><th>mean net</th></tr>${genRows.join("")}</table>` +
+    `<div class="summary">${vector}</div>` +
+    `<div class="lockrow"><button id="applyEvolved">Apply best to ${seatUIs[seatIdx].getName()}</button></div>`;
+  document.getElementById("applyEvolved")!.addEventListener("click", () => {
+    seatUIs[seatIdx].setP(r.best);
+    const marks = lockMarksOf(seatIdx);
+    for (const t of TRAITS) marks[t].textContent = "🧬";
   });
 });
