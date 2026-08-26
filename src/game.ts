@@ -1,4 +1,5 @@
 import { Rng, utilityDecide, type Candidate, type Personality } from "@precog/sim-core";
+import { runBatch } from "@precog/agent-forge/dist/batch.js";
 import { bestHand, bestFive, compareHandValue, CATEGORY_NAME, type HandValue } from "./handEval.js";
 export { bestHand, bestFive, compareHandValue, CATEGORY_NAME, type HandValue };
 
@@ -209,9 +210,13 @@ export function playHand(seats: Seat[], rng: Rng, ante = 2, betSize = 10, log?: 
 }
 
 export function runTable(seats: Seat[], hands: number, seed = 4242, log?: HandLog): void {
-  const rng = new Rng(seed);
-  for (let i = 0; i < hands; i++) {
-    if (seats.filter(x => x.chips > 2).length < 2) break;
-    playHand(seats, rng, 2, 10, i === 0 ? log : undefined);
-  }
+  // One table session shares a single RNG stream across all hands, so the Rng
+  // lives in the batch state and the per-hand seed is unused.
+  runBatch({
+    trials: hands,
+    seedBase: seed,
+    init: () => new Rng(seed),
+    stopWhen: () => seats.filter(x => x.chips > 2).length < 2,
+    runTrial: (rng, _seed, i) => playHand(seats, rng, 2, 10, i === 0 ? log : undefined),
+  });
 }
